@@ -1,3 +1,5 @@
 /.vscode
-knn
 /.history
+knn-enumerate
+knn-kdtree
+knn-parallel

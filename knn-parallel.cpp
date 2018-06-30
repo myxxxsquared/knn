@@ -10,6 +10,8 @@
 
 #include <pthread.h>
 
+#include <chrono>
+
 struct Point
 {
     int dims, nn;
@@ -28,7 +30,7 @@ struct Point
 
     void update(double dist, int index)
     {
-        if (queue.size() < nn)
+        if ((int)queue.size() < nn)
             queue.emplace(dist, index);
         else if (queue.top().first > dist)
         {
@@ -111,6 +113,7 @@ void *KNNApp::_thread_run(void *arg)
 {
     thread_init_data_t *data = (thread_init_data_t*)arg;
     data->app->thread_run(data->threadid);
+    return nullptr;
 }
 
 
@@ -157,8 +160,20 @@ void KNNApp::init(int point_count, int dimension, int nn, int partition_count)
     }
 
     // init vaild set
-    for(int i = 0; i < tasks.size(); ++i)
+    for(int i = 0; i < (int)tasks.size(); ++i)
         tasks_vaild.insert(i);
+
+    // printf("tasks: \n");
+    // for(int i = 0; i < (int)tasks.size(); ++i)
+    // {
+    //     printf("%d ~ %d\n", tasks[i].partitionid1, tasks[i].partitionid2);
+    // }
+
+    // printf("partitions: \n");
+    // for(int i = 0; i < (int)partitions.size(); ++i)
+    // {
+    //     printf("%d ~ %d\n", partitions[i].begin, partitions[i].end);
+    // }
 }
 
 class pthread_mutex_own
@@ -257,7 +272,7 @@ void KNNApp::thread_run(int tid)
         int p2b = partitions[p2].begin;
         int p2e = partitions[p2].end;
 
-        printf("Thread: %d, Task: %d, P1: %d(%d~%d), P2: %d(%d~%d)\n", tid, taskid, p1, p1b, p1e, p2, p2b, p2e);
+        // printf("Thread: %d, Task: %d, P1: %d(%d~%d), P2: %d(%d~%d)\n", tid, taskid, p1, p1b, p1e, p2, p2b, p2e);
 
         if(p1 == p2)
         {
@@ -265,7 +280,7 @@ void KNNApp::thread_run(int tid)
             {
                 for(int j = i + 1; j < p1e; ++j)
                 {
-
+                    update(i, j);
                 }
             }
         }
@@ -308,6 +323,7 @@ void KNNApp::run(int nthreads)
 
     thread_init_data[0].app = this;
     thread_init_data[0].threadid = 0;
+    _thread_run(&thread_init_data[0]);
     
     for(int i = 1; i < nthreads; ++i)
         pthread_join(threads[i], nullptr);
@@ -318,18 +334,27 @@ int main()
     int count = 10000;
     int dimension = 120;
     int nn = 18;
-    int partition = 80;
+    int partition = 90;
     int threads = 40;
+
+    srand((unsigned int)time(0));
 
     KNNApp app;
     app.init(count, dimension, nn, partition);
+
+    auto t0 = std::chrono::high_resolution_clock::now();
+
     app.run(threads);
+    auto t1 = std::chrono::high_resolution_clock::now();
+    auto dt = 1.e-9*std::chrono::duration_cast<std::chrono::nanoseconds>(t1-t0).count();
+    printf("time: %lf\n", dt);
+
     for(int i = 0; i < count; ++i)
     {
         app.points[i].collectKNN();
-        printf("% 5d: ", i);
-        for(int index: app.points[i].knn)
-            printf("% 5d ", index);
-        printf("\n");
+        // printf("% 5d: ", i);
+        // for(int index: app.points[i].knn)
+        //     printf("% 5d ", index);
+        // printf("\n");
     }
 }
